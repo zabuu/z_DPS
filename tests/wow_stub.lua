@@ -32,7 +32,7 @@ widget.__index = widget
 local function noop() end
 for _, m in ipairs({ "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor", "SetFrameStrata", "EnableMouse", "EnableMouseWheel",
   "SetClampedToScreen", "RegisterForDrag", "RegisterForClicks", "SetMovable", "SetResizable", "SetMinResize", "StartMoving",
-  "StopMovingOrSizing", "StartSizing", "SetTexture", "SetVertexColor", "SetFont", "SetTextColor",
+  "StopMovingOrSizing", "StartSizing", "SetTexture", "SetVertexColor", "SetTextColor",
   "SetJustifyH", "SetOrientation", "SetThumbTexture", "SetMinMaxValues", "SetValueStep", "SetCheckedTexture", "SetFontObject", "SetTextInsets", "SetAutoFocus" }) do
   widget[m] = noop
 end
@@ -58,6 +58,7 @@ function widget:SetScript(name, fn) self.scripts[name] = fn end
 function widget:GetScript(name) return self.scripts[name] end
 function widget:RegisterEvent(e) self.events[e] = true; STUB.frames[e] = STUB.frames[e] or {}; table.insert(STUB.frames[e], self) end
 function widget:UnregisterEvent(e) self.events[e] = nil end
+function widget:SetFont() return 1 end
 function widget:SetText(t) self.text_ = t end
 function widget:GetText() return self.text_ end
 function widget:GetStringWidth() return string.len(self.text_ or "") * 5 end
