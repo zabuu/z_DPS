@@ -32,6 +32,7 @@ Z.roster = {}
 Z.playerName = nil
 Z.singleShaman = nil
 local rosterPool = {}
+local lastRosterRefresh = 0
 
 local function addMember(unit, owner)
   local name = UnitName(unit)
@@ -44,6 +45,7 @@ local function addMember(unit, owner)
 end
 
 function Z.RefreshRoster()
+  lastRosterRefresh = GetTime()
   for name, rec in pairs(Z.roster) do Z.roster[name] = nil; table.insert(rosterPool, rec) end
   Z.playerName = UnitName("player")
   addMember("player")
@@ -73,6 +75,12 @@ end
 -- Second value is the pet name when the source is a pet.
 function Z.ResolveSource(name)
   local rec = Z.roster[name]
+  if not rec then
+    -- A pet summoned since the last roster event shows up here first; re-read the
+    -- group at most every 5s so a stream of mob names costs nothing.
+    local now = GetTime()
+    if now - lastRosterRefresh > 5 then Z.RefreshRoster(); rec = Z.roster[name] end
+  end
   if rec then
     if rec.owner then
       if Z.db.mergePets then return rec.owner, name end
@@ -204,11 +212,15 @@ SlashCmdList["ZDPS"] = function(msg)
   elseif cmd == "mode" then Z.UI.SetMode(rest)
   elseif cmd == "metric" then Z.UI.SetMetric(rest)
   elseif cmd == "report" then Z.UI.Report(rest ~= "" and rest or nil)
+  elseif cmd == "debug" then
+    Z.debug = not Z.debug; Z.Print("debug "..(Z.debug and "on: pet lines are echoed" or "off"))
+  elseif cmd == "roster" then
+    for name, rec in pairs(Z.roster) do Z.Print(name.."  "..rec.class..(rec.owner and ("  owner: "..rec.owner) or "")) end
   elseif cmd == "mem" then
     local ok = pcall(UpdateAddOnMemoryUsage)
     local kb = ok and GetAddOnMemoryUsage and GetAddOnMemoryUsage("z_DPS") or 0
     Z.Print(string.format("%.0f KB in use, %d tracked names, %d patterns.", kb, Z.Data.CountPlayers(), Z.Parser.count))
   else
-    Z.Print("commands: toggle, show, hide, lock, reset, config, mode <current|total>, metric <dps|...>, report [party|raid|say|<name>], mem")
+    Z.Print("commands: toggle, show, hide, lock, reset, config, mode <current|total>, metric <dps|...>, report [party|raid|say|<name>], roster, debug, mem")
   end
 end

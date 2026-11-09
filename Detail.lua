@@ -15,7 +15,7 @@ local LIST_W = 170
 
 local frame, listRows, legendRows, shareSegs, outcomeSegs, tiles
 listRows, legendRows, shareSegs, outcomeSegs, tiles = {}, {}, {}, {}, {}
-local state = { player = nil, selected = nil, offset = 0 }
+local state = { player = nil, selected = nil, offset = 0, win = nil }
 local rowBuf, detailBuf = {}, {}
 local nextTick = 0
 
@@ -266,14 +266,15 @@ end
 
 function T.Refresh()
   if not frame or not frame:IsShown() or not state.player then return end
-  local metric = D.metricByKey[Z.db.metric] or D.metrics[1]
-  local seg = Z.UI.Segment()
+  local win = state.win or Z.UI.Window(1)
+  local metric = Z.UI.Metric(win)
+  local seg = Z.UI.Segment(win)
   local p = seg and seg.players[state.player]
   if metric.threat or not p then frame:Hide(); return end
   if Z.db.classIcons and Z.UI.SetClassIcon(frame.icon, p.class) then frame.icon:Show(); frame.title:SetPoint("LEFT", frame.icon, "RIGHT", 3, 0)
   else frame.icon:Hide(); frame.title:SetPoint("LEFT", frame.icon, "LEFT", 0, 0) end
   frame.title:SetText(state.player.."  ·  "..metric.label)
-  local mode = Z.db.mode == "total" and "Total" or (seg.target or "Current")
+  local mode = win.db.mode == "total" and "Total" or (seg.target or "Current")
   frame.sub:SetText(format("%s  %s", mode, fmtTime(D.Duration(seg))))
   -- tiles
   local value = metric.value(p, seg)
@@ -289,19 +290,20 @@ function T.Refresh()
   paintOutcome(metric, p)
 end
 
-function T.Open(name)
+function T.Open(name, win)
   if not frame then build() end
   if state.player ~= name then state.selected = nil; state.offset = 0 end
   state.player = name
+  state.win = win or Z.UI.Window(1)
   frame:Show()
   nextTick = 0
   T.Refresh()
 end
 
-function T.Tick()
+function T.Tick(force)
   if not frame or not frame:IsShown() then return end
   local now = GetTime()
-  if now < nextTick then return end
+  if not force and now < nextTick then return end
   nextTick = now + 1
   T.Refresh()
 end

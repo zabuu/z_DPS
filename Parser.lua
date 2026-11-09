@@ -5,7 +5,7 @@ local Z = zDPS
 local P = {}
 Z.Parser = P
 
-local find, gsub, getn, tonumber = string.find, string.gsub, table.getn, tonumber
+local find, gsub, getn, tonumber, format = string.find, string.gsub, table.getn, tonumber, string.format
 
 -- English fallbacks; the client's own global string wins when present.
 local EN = {
@@ -323,6 +323,10 @@ end
 
 function P.OnEvent(event, line)
   local kind = P.Parse(event, line)
+  if Z.debug and find(event, "PET", 1, true) then
+    local owner = rec.s and Z.ResolveSource(rec.s)
+    Z.Print(format("%s | %s | %s -> %s", event, tostring(kind), tostring(line), tostring(owner)))
+  end
   if kind then Z.Data.Handle(kind, rec) end
 end
 

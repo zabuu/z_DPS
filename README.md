@@ -31,9 +31,12 @@ combat log.
 - Rows carry class icons (settings toggle). Pets, totems and minions are merged
   into their owner (settings toggle, on by default).
 - Drag the window by its title. Drag the small square in the bottom-right
-  corner to resize. The `l` button locks position and size, `r` resets the
-  current fight and history (shift-click resets only the total), `c` opens the
-  settings.
+  corner to resize. Title bar buttons: `+` opens another meter window with its
+  own metric and fight selection (windows are remembered between sessions),
+  the circular arrow resets the current fight and history (shift-click resets
+  only the total), the gear opens settings, the padlock locks position and
+  size of all windows, and `x` closes that window (the first window only
+  hides; `/zdps` brings everything back).
 - Mouse wheel scrolls long lists.
 
 ### Slash commands

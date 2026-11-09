@@ -242,3 +242,39 @@ STUB.party = 1; STUB.units.party1 = {name="Bankuu", class="PRIEST", hp=600, max=
 STUB.fire("PARTY_MEMBERS_CHANGED")
 ''')
     assert lua.eval('zDPS.Data.Segment("total").players.Zabbu') is None
+
+
+def test_pet_summoned_after_roster_is_picked_up(lua):
+    lua.execute('''
+STUB.units.pet = nil
+STUB.fire("PARTY_MEMBERS_CHANGED")           -- roster without a pet
+assert(zDPS.roster["Imp"] == nil)
+STUB.units.pet = {name="Voidwalker", class="PET"}  -- summoned, but no UNIT_PET arrives
+STUB.time = STUB.time + 6
+combat(true)
+log("CHAT_MSG_COMBAT_PET_HITS", "Voidwalker hits Boar for 30.")
+log("CHAT_MSG_SPELL_PET_DAMAGE", "Voidwalker's Torment hits Boar for 5.")
+''')
+    me = lua.eval('player("current", "Zabbu")')
+    assert me.dmg == 35 and me.spells["Voidwalker: Melee"].v == 30 and me.spells["Voidwalker: Torment"].v == 5
+
+
+def test_multiple_windows(lua):
+    lua.execute('''
+combat(true)
+log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Boar for 300.")
+log("CHAT_MSG_SPELL_PARTY_BUFF", "Bankuu's Flash Heal heals Zqdc for 500.")
+local w2 = zDPS.UI.AddWindow()
+assert(table.getn(zDPS.UI.windows) == 2 and w2.db.metric == "damage")
+zDPS.UI.SetMetric("healing", w2)
+zDPS.UI.Refresh()
+''')
+    assert lua.eval('zDPS.UI.Title(1)').startswith("DPS · Current")
+    assert lua.eval('zDPS.UI.Title(2)').startswith("Healing · Current")
+    assert lua.eval('zDPS.UI.RowAt(1, 2)').name == "Bankuu" and lua.eval('zDPS.UI.RowAt(1, 1)').name == "Zabbu"
+    assert lua.eval('zDPS.db.windowCount') == 2 and lua.eval('zDPS.db.windows[2].metric') == "healing"
+    # closing the second window drops its settings; closing the first only hides it
+    lua.execute('zDPS.UI.CloseWindow(zDPS.UI.Window(2))')
+    assert lua.eval('table.getn(zDPS.UI.windows)') == 1 and lua.eval('zDPS.db.windowCount') == 1
+    lua.execute('zDPS.UI.CloseWindow(zDPS.UI.Window(1))')
+    assert lua.eval('table.getn(zDPS.UI.windows)') == 1 and lua.eval('zDPSFrame:IsShown()') is False
