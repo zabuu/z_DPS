@@ -1,0 +1,93 @@
+# zDPS
+
+Compact, lightweight damage meter for the 1.12 client (OctoWoW / Turtle-style
+servers). One small window, class-coloured bars, click-through breakdowns, no
+per-event logging.
+
+## Install
+
+Copy the folder to `Interface/AddOns/z_DPS` (or clone this repository there)
+and enable **zDPS**. No native DLL is required. SuperWoW and Nampower are
+optional and only change how the server reports combat; zDPS reads the normal
+combat log.
+
+## Using it
+
+- **Left-click the title** to pick a metric: DPS, Damage, HPS, Healing,
+  Overhealing, Damage taken, Dispels, Interrupts, CC used, CC breaks, Deaths,
+  Consumables, Threat.
+- **Right-click the title** to switch between the current fight, the running
+  total and the last fights kept in history, or to report the view to party,
+  raid or say.
+- **Click a player** for the breakdown of that metric (spells, heals, abilities
+  taken, consumables...). **Click a spell** for hits, crits, misses, dodges,
+  parries, blocks, resists, absorbs, immunes, glancing/crushing, partial
+  absorbs/blocks/resists, min/max and totals. Right-click or click the title to
+  go back. Hovering a player shows their top five entries.
+- Drag the window by its title. Drag the small square in the bottom-right
+  corner to resize. The `l` button locks position and size, `r` resets the
+  current fight and history (shift-click resets only the total), `c` opens the
+  settings.
+- Mouse wheel scrolls long lists.
+
+### Slash commands
+
+`/zdps` toggles the window. Also `show`, `hide`, `lock`, `reset`, `config`,
+`mode current|total`, `metric <key>`, `report [party|raid|say|<name>]`, `mem`.
+
+## What counts
+
+- A **fight** opens when you enter combat, when any party or raid member is in
+  combat, or when a group member deals or takes damage. It closes two seconds
+  after nobody in the group is in combat. The window keeps showing the last
+  fight until the next one starts.
+- **Total** accumulates every fight since the last manual reset. Settings offer
+  automatic resets: never, when joining a group, when entering a new zone or
+  instance, or on every pull.
+- **Pets, totems and minions** are merged into their owner by default (shown as
+  `Cat: Claw`). Totems belong to the only shaman in the group; with several
+  shamans they stay unattributed. Turn merging off in settings to list pets as
+  their own rows.
+- **DPS** divides by fight time by default. Choose *Active* in settings to divide
+  by each player's own time between hits instead.
+- **Healing** is effective healing; **Overhealing** is the estimated part that
+  exceeded the target's missing health, using the health deficit the client
+  reports for group members. Heals on non-group units count as fully effective.
+- **Dispels** count casts of dispel, cleanse, cure, purge and devour spells,
+  minus server "fails to dispel" lines. **Interrupts** count "X interrupts Y's
+  Z" lines.
+- **CC used** counts casts of crowd-control spells. **CC breaks** credits the
+  group member whose damage landed on a crowd-controlled target within a second
+  before the CC faded; natural expiry is not a break.
+- **Consumables** count buff gains (flasks, elixirs, food, scrolls, juju,
+  weapon oils), potions and healthstones by their heal or mana lines, and
+  explosives by their damage lines (each throw once). Anything used in the
+  minute before a pull is credited to that pull.
+- **Threat** uses the server's threat API, the same `TWT_UDTSv4` addon message
+  protocol as TWThreat, for the live target. If TWThreat is loaded its replies
+  are reused instead of sending duplicate queries. It needs a party or raid.
+
+## Performance notes
+
+- Each combat log line is matched against the handful of patterns that can
+  appear on its event, split once more by whether it contains ` for `. A typical
+  hit resolves in the first few `string.find` calls; no tables, closures or
+  strings are created per line.
+- Aggregates are updated in place for the current fight and the total. Spell
+  records only hold the counters that were touched.
+- The window refreshes at most twice a second, and only while it is shown and a
+  fight is running or something changed. Rows are pooled frames; menus and the
+  settings window are built on first use.
+- Memory in use: `/zdps mem`.
+
+## Development
+
+Tests run headless with `lupa` (Lua 5.1 runtime with a small 1.12 widget stub):
+
+```
+pip install lupa pytest
+python -m pytest tests
+```
+
+The addon itself is written for the Lua 5.0 flavour the 1.12 client ships
+(`table.getn`, no `#`, `this`/`arg1`/`event` globals in handlers).

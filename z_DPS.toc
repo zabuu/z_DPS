@@ -1,0 +1,15 @@
+## Interface: 11200
+## Title: |cff7dff33z|rDPS
+## Author: zabuu
+## Notes: Compact, lightweight damage meter: DPS, damage, healing, overhealing, damage taken, dispels, interrupts, CC, CC breaks, deaths, consumables and server threat.
+## Version: 0.1.0
+## OptionalDeps: TWThreat, SuperWoW, Nampower
+## SavedVariables: zDPSDB
+
+Core.lua
+Lists.lua
+Parser.lua
+Data.lua
+Threat.lua
+UI.lua
+Config.lua
