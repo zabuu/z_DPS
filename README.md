@@ -45,7 +45,22 @@ combat log.
   hides; `/zdps` brings everything back).
 - Mouse wheel scrolls long lists.
 - **Text outline** (settings): None, Thin or Thick, for readability over bright
-  bars. Applies to every window, the detail popup and the settings window.
+  bars.
+- **Per-window settings.** The picker at the top of the settings window chooses
+  *All windows* or one window (a window's gear opens it on that window). A
+  window keeps only the settings it was given, highlighted in the settings
+  window; right-click one to use the all-windows value again, or *Reset
+  window* to clear them all. Counting settings (merge pets, DPS time, reset
+  total, fights kept, report lines, short numbers, locked) are shared.
+- **Show:** *Always*, *In combat*, or *In combat +5s* (stays a few seconds
+  after the fight to read the final numbers), per window — e.g. a threat
+  window only in combat. Windows set this way stay up while the settings
+  window is open so they can be adjusted, and a window put away with `x` or
+  `/zdps` isn't brought back by combat.
+- **Colours:** background, title bar, border (each with opacity), text, and
+  the bar colour used when class colours are off. Clicking a swatch opens the
+  game's colour picker. Threat bars keep their own colour unless the window has
+  a bar colour of its own.
 
 ### Slash commands
 
