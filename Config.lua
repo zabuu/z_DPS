@@ -125,8 +125,9 @@ local function build()
   check(frame, "Show title bar", "showTitle", x1, y)
   check(frame, "Class colours", "classColors", x2, y); y = y - ROW
   check(frame, "Hide out of combat", "hideOutOfCombat", x1, y)
-  check(frame, "Show percent", "showPercent", x2, y); y = y - ROW
+  check(frame, "Class icons", "classIcons", x2, y); y = y - ROW
   check(frame, "Short numbers (1.2k)", "shortNumbers", x1, y)
+  check(frame, "Show percent", "showPercent", x2, y); y = y - ROW
   check(frame, "Rank numbers", "showRank", x2, y); y = y - ROW - 2
   cycle(frame, "DPS time", "dpsTime", { { "fight", "Fight" }, { "active", "Active" } }, x1, y)
   cycle(frame, "Reset total", "resetTotal", { { "never", "Never" }, { "group", "Joining a group" }, { "instance", "New instance" }, { "combat", "Entering combat" } }, x2, y); y = y - ROW - 4

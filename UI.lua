@@ -15,6 +15,21 @@ U.colors = {
   spell = { .27, .5, .78 }, detail = { .45, .45, .52 }, pet = { .6, .5, .35 }, threat = { .78, .35, .25 },
 }
 local CLASS_FALLBACK = { r = .6, g = .6, b = .6 }
+local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+U.CLASS_COORDS = {
+  WARRIOR = { 0, .25, 0, .25 }, MAGE = { .25, .5, 0, .25 }, ROGUE = { .5, .75, 0, .25 }, DRUID = { .75, 1, 0, .25 },
+  HUNTER = { 0, .25, .25, .5 }, SHAMAN = { .25, .5, .25, .5 }, PRIEST = { .5, .75, .25, .5 }, WARLOCK = { .75, 1, .25, .5 },
+  PALADIN = { 0, .25, .5, .75 },
+}
+local PET_ICON = "Interface\\Icons\\Ability_Hunter_BeastCall"
+
+-- Points a texture at a class icon. Returns false when there is none for that class.
+function U.SetClassIcon(tex, class)
+  local c = U.CLASS_COORDS[class]
+  if c then tex:SetTexture(CLASS_TEX); tex:SetTexCoord(c[1], c[2], c[3], c[4]); return true end
+  if class == "PET" then tex:SetTexture(PET_ICON); tex:SetTexCoord(.07, .93, .07, .93); return true end
+  return false
+end
 
 local frame, title, rows, grip, menu
 rows = {}
@@ -150,6 +165,7 @@ local function onRowClick()
   if not r then return end
   if arg1 == "RightButton" then U.Back(); return end
   if view.level == 1 and r.kind == "player" then
+    if Z.Detail then Z.Detail.Open(r.key); return end
     view.level = 2; view.player = r.key; view.offset = 0
   elseif view.level == 2 and r.kind ~= "player" and r.kind ~= "threat" then
     local metric = D.metricByKey[Z.db.metric]
@@ -185,6 +201,8 @@ local function getRow(i)
   r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   r.bar = r:CreateTexture(nil, "ARTWORK"); r.bar:SetTexture(WHITE)
   r.bar:SetPoint("TOPLEFT", r, "TOPLEFT", 0, 0); r.bar:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", 0, 0)
+  r.icon = r:CreateTexture(nil, "OVERLAY")
+  r.icon:SetPoint("LEFT", r, "LEFT", 1, 0)
   r.name = r:CreateFontString(nil, "OVERLAY"); r.name:SetPoint("LEFT", r, "LEFT", 3, 0); r.name:SetJustifyH("LEFT")
   r.value = r:CreateFontString(nil, "OVERLAY"); r.value:SetPoint("RIGHT", r, "RIGHT", -3, 0); r.value:SetJustifyH("RIGHT")
   r:SetScript("OnClick", onRowClick)
@@ -206,6 +224,7 @@ local function layoutRows()
     r:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -top - (i - 1) * rh)
     r:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -top - (i - 1) * rh)
     font(r.name, Z.db.fontSize); font(r.value, Z.db.fontSize)
+    r.icon:SetWidth(rh - 3); r.icon:SetHeight(rh - 3)
     r.name:SetPoint("RIGHT", r.value, "LEFT", -4, 0)
   end
   for i = U.visible + 1, getn(rows) do rows[i]:Hide() end
@@ -238,6 +257,11 @@ end
 -- Refresh ----------------------------------------------------------------------------------
 local function paintRow(f, r, maxValue, color, text, cr, cg, cb)
   f.row = r
+  if Z.db.classIcons and r.class and U.SetClassIcon(f.icon, r.class) then
+    f.icon:Show(); f.name:SetPoint("LEFT", f, "LEFT", Z.db.rowHeight + 1, 0)
+  else
+    f.icon:Hide(); f.name:SetPoint("LEFT", f, "LEFT", 3, 0)
+  end
   f.name:SetText(text)
   f.value:SetText(r.text or "")
   local w = f:GetWidth()
@@ -251,9 +275,11 @@ local function playerRows(seg, metric)
   local sum = D.PlayerRows(seg, metric, rowBuf)
   for i = 1, rowBuf.n do
     local r = rowBuf[i]
-    if metric.count then r.text = format("%d", r.value)
-    elseif Z.db.showPercent and sum > 0 then r.text = format("%s  %.0f%%", U.FormatNumber(r.value), r.value / sum * 100)
-    else r.text = U.FormatNumber(r.value) end
+    local v = U.FormatNumber(r.value)
+    if metric.count then v = format("%d", r.value)
+    elseif r.total then v = format("%s (%s)", v, U.FormatNumber(r.total)) end
+    if not metric.count and Z.db.showPercent and sum > 0 then r.text = format("%s  %.0f%%", v, r.value / sum * 100)
+    else r.text = v end
   end
   return sum
 end
@@ -450,6 +476,7 @@ function U.Init()
     if now < nextRefresh then return end
     nextRefresh = now + .5
     if dirty or Z.inFight or Z.db.metric == "threat" then U.Refresh() end
+    if Z.Detail then Z.Detail.Tick() end
   end)
 
   local bar = CreateFrame("Frame", nil, frame)

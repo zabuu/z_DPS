@@ -179,24 +179,31 @@ zDPS.UI.Refresh()
     # level 1: two players, Zabbu first
     text = lua.eval('(function() local t={}; for i=1,zDPS.UI.visible do local f=zDPS.UI.rowFrame(i); if f.row then t[i]=f.name_text() .. "|" .. f.value_text() end end; return t end)()') if False else None
     first = lua.eval('zDPS.UI.RowAt(1)')
-    assert first.name == "Zabbu" and first.text.startswith("100") and first.text.endswith("95%")
+    assert first.name == "Zabbu" and first.text == "100 (1000)  95%"
     assert lua.eval('zDPS.UI.RowAt(2)').name == "Bankuu"
     assert lua.eval('zDPS.UI.Title()') == "DPS · Current  0:10"
-    # click into Zabbu -> spells
+    # click into Zabbu -> detail popup
     lua.execute('zDPS.UI.ClickRow(1, "LeftButton")')
-    assert lua.eval('zDPS.UI.Title()') == "Zabbu · DPS"
-    assert lua.eval('zDPS.UI.RowAt(1)').name == "Fireball" and lua.eval('zDPS.UI.RowAt(1)').text == "900  90%"
-    assert lua.eval('zDPS.UI.RowAt(2)').name == "Frostbolt"
-    # click into Fireball -> detail
-    lua.execute('zDPS.UI.ClickRow(1, "LeftButton")')
-    assert lua.eval('zDPS.UI.Title()') == "Zabbu · Fireball"
-    names = lua.eval('(function() local t={} for i=1,8 do local r=zDPS.UI.RowAt(i); if r then t[i]=r.name.."="..r.text end end return t end)()')
-    got = {names[i].split("=")[0]: names[i].split("=")[1] for i in range(1, 9) if names[i]}
-    assert got["Hits"] == "1  (33%)  avg 300" and got["Crits"] == "1  (33%)  avg 600" and got["Missed"] == "1  (33%)"
-    assert got["Total"] == "900  (3)" and got["Min / max"] == "300 / 600"
-    # right click goes back twice
-    lua.execute('zDPS.UI.ClickRow(1, "RightButton"); zDPS.UI.ClickRow(1, "RightButton")')
+    assert lua.eval('zDPSDetail:IsShown()') is True
+    assert lua.eval('zDPS.Detail.frame.title:GetText()') == "Zabbu  ·  DPS"
+    assert lua.eval('zDPS.Detail.frame.sub:GetText()') == "Boar  0:10"
+    tiles = lua.eval('(function() local t={} for i=1,4 do t[i]=zDPS.Detail.Tiles()[i].value:GetText() end return t end)()')
+    assert tiles[1] == "1000" and tiles[2] == "100" and tiles[3] == "95%"
+    rows = lua.eval('(function() local t={} for i,r in ipairs(zDPS.Detail.ListRows()) do t[i]={name=r.name:GetText(), value=r.value:GetText(), sel=r.sel:IsShown(), shown=r:IsShown()} end return t end)()')
+    assert rows[1].name == "Fireball" and rows[1].value == "900  90%" and rows[1].sel is True
+    assert rows[2].name == "Frostbolt" and rows[3].shown is False
+    assert lua.eval('zDPS.Detail.frame.right.title:GetText()') == "Fireball"
+    legend = lua.eval('(function() local t={} for i,r in ipairs(zDPS.Detail.LegendRows()) do if r:IsShown() then t[r.name:GetText()]=r.value:GetText() end end return t end)()')
+    assert legend["Hits"] == "1  (33%)  avg 300" and legend["Crits"] == "1  (33%)  avg 600" and legend["Missed"] == "1  (33%)"
+    assert legend["Total"] == "900  (3)" and legend["Min / max"] == "300 / 600"
+    # select Frostbolt
+    lua.execute('this = zDPS.Detail.ListRows()[2]; this.scripts.OnClick()')
+    assert lua.eval('zDPS.Detail.frame.right.title:GetText()') == "Frostbolt"
+    assert lua.eval('zDPS.Detail.ListRows()[2].sel:IsShown()') is True
+    # main window stays on the player list
     assert lua.eval('zDPS.UI.Title()').startswith("DPS · Current")
+    # DPS rows show the total in parentheses
+    assert first.text == "100 (1000)  95%"
     # damage mode shows raw numbers, total mode label
     lua.execute('zDPS.UI.SetMetric("damage"); zDPS.UI.SetMode("total")')
     assert lua.eval('zDPS.UI.Title()').startswith("Damage · Total")

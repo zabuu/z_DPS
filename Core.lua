@@ -8,7 +8,7 @@ local find, getn = string.find, table.getn
 local GetTime = GetTime
 
 Z.defaults = {
-  locked = false, hideOutOfCombat = false, showTitle = true, classColors = true,
+  locked = false, hideOutOfCombat = false, showTitle = true, classColors = true, classIcons = true,
   mergePets = true, shortNumbers = true, showPercent = true, showRank = false,
   rowHeight = 13, fontSize = 10, barAlpha = .85, backdropAlpha = .7, barTexture = "flat",
   metric = "dps", mode = "current", historySize = 5, dpsTime = "fight",

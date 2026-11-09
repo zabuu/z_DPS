@@ -12,4 +12,5 @@ Parser.lua
 Data.lua
 Threat.lua
 UI.lua
+Detail.lua
 Config.lua

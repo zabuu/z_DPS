@@ -32,7 +32,7 @@ widget.__index = widget
 local function noop() end
 for _, m in ipairs({ "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor", "SetFrameStrata", "EnableMouse", "EnableMouseWheel",
   "SetClampedToScreen", "RegisterForDrag", "RegisterForClicks", "SetMovable", "SetResizable", "SetMinResize", "StartMoving",
-  "StopMovingOrSizing", "StartSizing", "SetTexture", "SetVertexColor", "SetTextColor",
+  "StopMovingOrSizing", "StartSizing", "SetTexture", "SetTexCoord", "SetVertexColor", "SetTextColor",
   "SetJustifyH", "SetOrientation", "SetThumbTexture", "SetMinMaxValues", "SetValueStep", "SetCheckedTexture", "SetFontObject", "SetTextInsets", "SetAutoFocus" }) do
   widget[m] = noop
 end
@@ -91,7 +91,7 @@ function STUB.tick(dt)
   end
 end
 function STUB.load(root)
-  for _, name in ipairs({ "Core.lua", "Lists.lua", "Parser.lua", "Data.lua", "Threat.lua", "UI.lua", "Config.lua" }) do
+  for _, name in ipairs({ "Core.lua", "Lists.lua", "Parser.lua", "Data.lua", "Threat.lua", "UI.lua", "Detail.lua", "Config.lua" }) do
     local chunk = assert(loadfile(root.."/"..name)); chunk()
   end
 end

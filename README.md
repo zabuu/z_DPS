@@ -19,11 +19,17 @@ combat log.
 - **Right-click the title** to switch between the current fight, the running
   total and the last fights kept in history, or to report the view to party,
   raid or say.
-- **Click a player** for the breakdown of that metric (spells, heals, abilities
-  taken, consumables...). **Click a spell** for hits, crits, misses, dodges,
-  parries, blocks, resists, absorbs, immunes, glancing/crushing, partial
-  absorbs/blocks/resists, min/max and totals. Right-click or click the title to
-  go back. Hovering a player shows their top five entries.
+- **Click a player** to open the detail popup: summary tiles (total, per
+  second, share of the group, active time), a share graph of the breakdown, the
+  breakdown list (spells, heals, abilities taken, consumables...) and, for the
+  selected entry, an outcome graph with hits, crits, misses, dodges, parries,
+  blocks, resists, absorbs, immunes, glancing/crushing, partial
+  absorbs/blocks/resists, min/max and totals. Heals show effective versus
+  overheal. The popup follows the main window's metric and fight while open.
+  Hovering a player on the main window shows their top five entries.
+- DPS and HPS rows show the total in parentheses: `1.2k (45.3k)  31%`.
+- Rows carry class icons (settings toggle). Pets, totems and minions are merged
+  into their owner (settings toggle, on by default).
 - Drag the window by its title. Drag the small square in the bottom-right
   corner to resize. The `l` button locks position and size, `r` resets the
   current fight and history (shift-click resets only the total), `c` opens the

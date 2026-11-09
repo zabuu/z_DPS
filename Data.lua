@@ -413,11 +413,11 @@ local function detailFor(p, field, key, out)
 end
 
 D.metrics = {
-  { key = "dps", label = "DPS", rate = true, value = function(p, seg) return p.dmg / D.ActiveTime(p, seg) end,
+  { key = "dps", label = "DPS", rate = true, value = function(p, seg) return p.dmg / D.ActiveTime(p, seg) end, total = function(p) return p.dmg end,
     rows = function(p, seg, out) recordRows(p, "spells", out) end, detail = detailFor, field = "spells" },
   { key = "damage", label = "Damage", value = function(p) return p.dmg end,
     rows = function(p, seg, out) recordRows(p, "spells", out) end, detail = detailFor, field = "spells" },
-  { key = "hps", label = "HPS", rate = true, value = function(p, seg) return (p.heal - p.over) / D.ActiveTime(p, seg) end,
+  { key = "hps", label = "HPS", rate = true, value = function(p, seg) return (p.heal - p.over) / D.ActiveTime(p, seg) end, total = function(p) return p.heal - p.over end,
     rows = function(p, seg, out) recordRows(p, "heals", out) end, detail = detailFor, field = "heals" },
   { key = "healing", label = "Healing", value = function(p) return p.heal - p.over end,
     rows = function(p, seg, out) recordRows(p, "heals", out) end, detail = detailFor, field = "heals" },
@@ -451,6 +451,7 @@ function D.PlayerRows(seg, metric, out)
         n = n + 1
         local r = row(out, n, name, v, name, "player")
         r.class = p.class
+        r.total = metric.total and metric.total(p) or nil
         sum = sum + v
       end
     end
