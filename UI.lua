@@ -57,7 +57,7 @@ end
 
 local function font(fs, size, color)
   fs:SetFont(FONT, size, "")
-  fs:SetShadowColor(0, 0, 0, .9); fs:SetShadowOffset(1, -1)
+  if fs.SetShadowColor then fs:SetShadowColor(0, 0, 0, .9); fs:SetShadowOffset(1, -1) end
   color = color or U.colors.text
   fs:SetTextColor(color[1], color[2], color[3], 1)
 end

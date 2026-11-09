@@ -14,7 +14,7 @@ local COL = 150
 
 local function font(fs, size, muted)
   fs:SetFont(FONT, size or 10, "")
-  fs:SetShadowColor(0, 0, 0, .9); fs:SetShadowOffset(1, -1)
+  if fs.SetShadowColor then fs:SetShadowColor(0, 0, 0, .9); fs:SetShadowOffset(1, -1) end
   local c = muted and Z.UI.colors.muted or Z.UI.colors.text
   fs:SetTextColor(c[1], c[2], c[3], 1)
 end

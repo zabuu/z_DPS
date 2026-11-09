@@ -32,7 +32,7 @@ widget.__index = widget
 local function noop() end
 for _, m in ipairs({ "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor", "SetFrameStrata", "EnableMouse", "EnableMouseWheel",
   "SetClampedToScreen", "RegisterForDrag", "RegisterForClicks", "SetMovable", "SetResizable", "SetMinResize", "StartMoving",
-  "StopMovingOrSizing", "StartSizing", "SetTexture", "SetVertexColor", "SetFont", "SetShadowColor", "SetShadowOffset", "SetTextColor",
+  "StopMovingOrSizing", "StartSizing", "SetTexture", "SetVertexColor", "SetFont", "SetTextColor",
   "SetJustifyH", "SetOrientation", "SetThumbTexture", "SetMinMaxValues", "SetValueStep", "SetCheckedTexture", "SetFontObject", "SetTextInsets", "SetAutoFocus" }) do
   widget[m] = noop
 end
