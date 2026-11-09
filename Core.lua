@@ -16,7 +16,13 @@ Z.defaults = {
   fightOpacity = 1, idleOpacity = 1,
   width = 180, height = 118, point = "CENTER", x = 260, y = -120,
   threatRows = 8, reportRows = 5,
+  outline = "none",        -- none | thin | thick: outline around all text
+  showPerSecond = true,    -- Damage and Healing rows also show DPS / HPS in parentheses
 }
+
+-- Font flags for the text outline setting.
+local OUTLINE = { none = "", thin = "OUTLINE", thick = "THICKOUTLINE" }
+function Z.FontFlags() return OUTLINE[Z.db and Z.db.outline or "none"] or "" end
 
 function Z.Print(msg) DEFAULT_CHAT_FRAME:AddMessage("|cff7dff33zDPS|r "..tostring(msg)) end
 

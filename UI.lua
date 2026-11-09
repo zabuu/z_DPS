@@ -77,7 +77,7 @@ local function surface(f, color, alpha)
 end
 
 local function font(fs, size, color)
-  if not fs:SetFont(FONT, size or 10, "") and fs.SetFontObject then fs:SetFontObject(GameFontHighlightSmall) end
+  if not fs:SetFont(FONT, size or 10, Z.FontFlags()) and fs.SetFontObject then fs:SetFontObject(GameFontHighlightSmall) end
   color = color or U.colors.text
   fs:SetTextColor(color[1], color[2], color[3], 1)
 end
@@ -300,7 +300,8 @@ local function playerRows(win, seg, metric)
     local r = rowBuf[i]
     local v = U.FormatNumber(r.value)
     if metric.count then v = format("%d", r.value)
-    elseif r.total then v = format("%s (%s)", v, U.FormatNumber(r.total)) end
+    elseif r.total then v = format("%s (%s)", v, U.FormatNumber(r.total))
+    elseif r.perSecond then v = format("%s (%s)", v, U.FormatNumber(r.perSecond)) end
     if not metric.count and Z.db.showPercent and sum > 0 then r.text = format("%s  %.0f%%", v, r.value / sum * 100)
     else r.text = v end
   end
@@ -479,6 +480,8 @@ end
 
 function U.ApplySettings()
   for i = 1, getn(U.windows) do applyWindow(U.windows[i]) end
+  if Z.Detail and Z.Detail.ApplyFonts then Z.Detail.ApplyFonts() end
+  if Z.Config and Z.Config.ApplyFonts then Z.Config.ApplyFonts() end
   dirty = true
   U.Refresh()
 end
@@ -553,10 +556,19 @@ local function createWindow(index)
   local grip = CreateFrame("Button", nil, f)
   win.grip = grip
   grip.win = win
-  grip:SetWidth(9); grip:SetHeight(9)
-  grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
-  grip.tex = grip:CreateTexture(nil, "OVERLAY"); grip.tex:SetTexture(WHITE); grip.tex:SetAllPoints(grip)
-  grip.tex:SetVertexColor(U.colors.border[1], U.colors.border[2], U.colors.border[3], .9)
+  grip:SetWidth(10); grip:SetHeight(10)
+  grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
+  -- six small dots in a triangle pointing into the corner; brighter while hovered
+  grip.dots = {}
+  for _, d in ipairs({ { 0, 0 }, { 3, 0 }, { 6, 0 }, { 0, 3 }, { 3, 3 }, { 0, 6 } }) do
+    local t = grip:CreateTexture(nil, "OVERLAY"); t:SetTexture(WHITE)
+    t:SetWidth(2); t:SetHeight(2); t:SetPoint("BOTTOMRIGHT", grip, "BOTTOMRIGHT", -d[1], d[2])
+    table.insert(grip.dots, t)
+  end
+  local function shade(g, a) local c = U.colors.muted; for i = 1, getn(g.dots) do g.dots[i]:SetVertexColor(c[1], c[2], c[3], a) end end
+  shade(grip, .45)
+  grip:SetScript("OnEnter", function() shade(this, 1) end)
+  grip:SetScript("OnLeave", function() shade(this, .45) end)
   grip:SetScript("OnMouseDown", function() if not Z.db.locked then this.win.frame:StartSizing("BOTTOMRIGHT") end end)
   grip:SetScript("OnMouseUp", function() this.win.frame:StopMovingOrSizing(); savePosition(this.win); layoutRows(this.win); dirty = true; U.Refresh() end)
 

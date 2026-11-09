@@ -15,7 +15,7 @@ local LIST_W = 170
 
 local frame, listRows, legendRows, shareSegs, outcomeSegs, tiles
 listRows, legendRows, shareSegs, outcomeSegs, tiles = {}, {}, {}, {}, {}
-local state = { player = nil, selected = nil, offset = 0, win = nil }
+local state = { player = nil, selected = nil, offset = 0, win = nil, view = "spells" }   -- view: spells | targets
 local rowBuf, detailBuf = {}, {}
 local nextTick = 0
 
@@ -33,10 +33,18 @@ local OUTCOME = {
 local SEGMENTS = { { "n", "Hits" }, { "crit", "Crits" }, { "miss", "Missed" }, { "dodge", "Dodged" }, { "parry", "Parried" },
   { "block", "Blocked" }, { "resist", "Resisted" }, { "absorb", "Absorbed" }, { "immune", "Immune" }, { "evade", "Evaded" }, { "reflect", "Reflected" } }
 
+-- every font string made here is remembered so the outline setting can be re-applied
+local fonts = {}
 local function font(fs, size, muted)
-  if not fs:SetFont(FONT, size or 10, "") and fs.SetFontObject then fs:SetFontObject(GameFontHighlightSmall) end
+  if not fs.zSize then table.insert(fonts, fs) end
+  fs.zSize = size or 10
+  if not fs:SetFont(FONT, fs.zSize, Z.FontFlags()) and fs.SetFontObject then fs:SetFontObject(GameFontHighlightSmall) end
   local c = muted and Z.UI.colors.muted or Z.UI.colors.text
   fs:SetTextColor(c[1], c[2], c[3], 1)
+end
+function T.ApplyFonts()
+  local flags = Z.FontFlags()
+  for i = 1, getn(fonts) do fonts[i]:SetFont(FONT, fonts[i].zSize, flags) end
 end
 
 local function tex(parent, layer)
@@ -72,8 +80,8 @@ local function listRow(i)
   if r then return r end
   r = CreateFrame("Button", nil, frame.list)
   r:SetHeight(ROW_H - 1)
-  r:SetPoint("TOPLEFT", frame.list, "TOPLEFT", 1, -1 - (i - 1) * ROW_H)
-  r:SetPoint("TOPRIGHT", frame.list, "TOPRIGHT", -1, -1 - (i - 1) * ROW_H)
+  r:SetPoint("TOPLEFT", frame.list, "TOPLEFT", 1, -1 - i * ROW_H)   -- the first line holds the Spells | Targets switch
+  r:SetPoint("TOPRIGHT", frame.list, "TOPRIGHT", -1, -1 - i * ROW_H)
   r.bar = tex(r); r.bar:SetPoint("TOPLEFT", r, "TOPLEFT", 0, 0); r.bar:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", 0, 0)
   r.dot = tex(r, "OVERLAY"); r.dot:SetWidth(5); r.dot:SetHeight(5); r.dot:SetPoint("LEFT", r, "LEFT", 3, 0)
   r.sel = tex(r, "BACKGROUND"); r.sel:SetAllPoints(r); r.sel:SetVertexColor(1, 1, 1, .08); r.sel:Hide()
@@ -123,6 +131,43 @@ local function layoutSegments(pool, parent, count, total, bar)
     else s:Hide() end
   end
   for i = count + 1, getn(pool) do pool[i]:Hide() end
+end
+
+-- the field that holds the list being shown, for the current view
+local function viewField(metric)
+  if state.view == "targets" and metric.targets then return metric.targetField end
+  return metric.field
+end
+
+local function setView(view)
+  if state.view == view then return end
+  state.view = view; state.selected = nil; state.offset = 0
+  T.Refresh()
+end
+
+local function tab(i, view)
+  local b = CreateFrame("Button", nil, frame.list)
+  b:SetHeight(ROW_H - 1)
+  b.text = b:CreateFontString(nil, "OVERLAY"); b.text:SetPoint("LEFT", b, "LEFT", 0, 0); font(b.text, 9)
+  b.view = view
+  b:SetScript("OnClick", function() setView(this.view) end)
+  frame.tabs[i] = b
+  return b
+end
+
+local function paintTabs(metric)
+  local spells, targets = frame.tabs[1], frame.tabs[2]
+  spells.text:SetText(metric.field and "Spells" or "Breakdown")
+  spells:SetWidth(spells.text:GetStringWidth() + 4)
+  local on, off = Z.UI.colors.accent, Z.UI.colors.muted
+  local c = state.view == "spells" and on or off
+  spells.text:SetTextColor(c[1], c[2], c[3], 1)
+  if metric.targets then
+    c = state.view == "targets" and on or off
+    targets.text:SetText("Targets"); targets.text:SetTextColor(c[1], c[2], c[3], 1)
+    targets:SetWidth(targets.text:GetStringWidth() + 4)
+    frame.tabSep:Show(); targets:Show()
+  else frame.tabSep:Hide(); targets:Hide() end
 end
 
 local function build()
@@ -180,13 +225,19 @@ local function build()
   frame.outcome.bg = tex(frame.outcome, "BACKGROUND"); frame.outcome.bg:SetAllPoints(frame.outcome); frame.outcome.bg:SetVertexColor(.08, .1, .13, 1)
   frame.empty = frame.right:CreateFontString(nil, "OVERLAY"); frame.empty:SetPoint("TOPLEFT", frame.right, "TOPLEFT", 3, -20); font(frame.empty, 9, true)
 
-  T.visible = floor((H + bodyTop - 2) / ROW_H)
+  frame.tabs = {}
+  local spells = tab(1, "spells"); spells:SetPoint("TOPLEFT", frame.list, "TOPLEFT", 4, -1)
+  frame.tabSep = frame.list:CreateFontString(nil, "OVERLAY"); font(frame.tabSep, 9, true); frame.tabSep:SetText("|")
+  frame.tabSep:SetPoint("LEFT", spells, "RIGHT", 2, 0)
+  local targets = tab(2, "targets"); targets:SetPoint("LEFT", frame.tabSep, "RIGHT", 4, 0)
+
+  T.visible = floor((H + bodyTop - 2) / ROW_H) - 1
   for i = 1, T.visible do listRow(i) end
   frame:Hide()
 end
 
 -- Refresh -----------------------------------------------------------------------------
-local function paintList(metric, p, seg)
+local function paintList(metric, p, seg, field)
   local sum = 0
   for i = 1, rowBuf.n do sum = sum + (rowBuf[i].value or 0) end
   if state.offset > max(rowBuf.n - T.visible, 0) then state.offset = max(rowBuf.n - T.visible, 0) end
@@ -219,13 +270,53 @@ local function paintList(metric, p, seg)
       f:Show()
     else f.row = nil; f:Hide() end
   end
-  if not selectedFound and rowBuf.n > 0 and not (state.selected and p[metric.field or ""] and p[metric.field or ""][state.selected]) then
+  if not selectedFound and rowBuf.n > 0 and not (state.selected and p[field or ""] and p[field or ""][state.selected]) then
     state.selected = rowBuf[1].key
     if listRows[1].row then listRows[1].sel:Show() end
   end
 end
 
+-- right side for a target: its amount, share of this player's total and, for heals, overheal
+local function paintTarget(metric, p)
+  local right, name = frame.right, state.selected
+  local t = name and p[metric.targetField] and p[metric.targetField][name]
+  right.title:SetText(name or "")
+  if not t then
+    frame.outcome:Hide(); frame.empty:Show(); frame.empty:SetText("select a target")
+    for i = 1, getn(legendRows) do legendRows[i]:Hide() end
+    return
+  end
+  frame.empty:Hide()
+  local sum = 0
+  for i = 1, rowBuf.n do sum = sum + (rowBuf[i].value or 0) end
+  local n = 0
+  local function line(label, text, color)
+    n = n + 1
+    local f = legendRow(n)
+    if color then f.dot:SetVertexColor(color[1], color[2], color[3], 1); f.dot:Show() else f.dot:Hide() end
+    f.name:SetText(label); f.value:SetText(text); f:Show()
+  end
+  if type(t) == "table" then   -- heals: {n, v, over}
+    local over = t.over or 0
+    local s = segTex(outcomeSegs, frame.outcome, 1); s.v = t.v - over; s.c = OUTCOME.Effective
+    s = segTex(outcomeSegs, frame.outcome, 2); s.v = over; s.c = OUTCOME.Overheal
+    frame.outcome:Show(); layoutSegments(outcomeSegs, frame.outcome, 2, t.v, frame.outcome)
+    local shown = metric.targetOver and over or (t.v - over)
+    line(metric.targetOver and "Overheal" or "Healing", fmt(shown))
+    line("Share", format("%.0f%%", sum > 0 and shown / sum * 100 or 0))
+    line("Effective", fmt(t.v - over), OUTCOME.Effective)
+    line("Overheal", format("%s  (%.0f%%)", fmt(over), t.v > 0 and over / t.v * 100 or 0), OUTCOME.Overheal)
+    line("Heals", format("%d", t.n))
+  else                         -- damage: a plain number
+    frame.outcome:Hide()
+    line("Damage", fmt(t))
+    line("Share", format("%.0f%%", sum > 0 and t / sum * 100 or 0))
+  end
+  for i = n + 1, getn(legendRows) do legendRows[i]:Hide() end
+end
+
 local function paintOutcome(metric, p)
+  if state.view == "targets" and metric.targets then return paintTarget(metric, p) end
   local right = frame.right
   local rec = metric.field and p[metric.field] and state.selected and p[metric.field][state.selected]
   if not rec then
@@ -285,8 +376,11 @@ function T.Refresh()
   tiles[2].value:SetText(metric.count and "-" or fmt((metric.rate and value) or (totalValue / D.Duration(seg))))
   tiles[3].value:SetText(format("%.0f%%", groupSum > 0 and value / groupSum * 100 or 0))
   tiles[4].value:SetText(format("%.0f%%", min(p.active / D.Duration(seg) * 100, 100)))
-  if metric.rows then metric.rows(p, seg, rowBuf) else rowBuf.n = 0 end
-  paintList(metric, p, seg)
+  if state.view == "targets" and not metric.targets then state.view = "spells"; state.selected = nil; state.offset = 0 end
+  paintTabs(metric)
+  if state.view == "targets" then metric.targets(p, rowBuf)
+  elseif metric.rows then metric.rows(p, seg, rowBuf) else rowBuf.n = 0 end
+  paintList(metric, p, seg, viewField(metric))
   paintOutcome(metric, p)
 end
 

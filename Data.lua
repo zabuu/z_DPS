@@ -106,6 +106,8 @@ local function addDamage(seg, owner, key, r, now)
   if r.pabsorb then bump(s, "pabsorb", r.pabsorb) end
   if r.pblock then bump(s, "pblock", r.pblock) end
   if r.presist then bump(s, "presist", r.presist) end
+  -- where it went: one number per target name
+  if r.t then local tt = sub(p, "dmgTargets"); tt[r.t] = (tt[r.t] or 0) + a end
   if not seg.target and r.t and not Z.roster[r.t] then seg.target = r.t end
 end
 
@@ -146,6 +148,8 @@ local function addHeal(seg, owner, sp, a, over, r)
   if r.periodic then bump(s, "tick") end
   if not s.min or a < s.min then s.min = a end
   if not s.max or a > s.max then s.max = a end
+  -- who it went to: amount and overheal per target name
+  if r.t then local h = rec(sub(p, "healTargets"), r.t); h.n = h.n + 1; h.v = h.v + a; if over > 0 then bump(h, "over", over) end end
 end
 
 local function addCount(seg, owner, field, listField, key, by)
@@ -344,6 +348,27 @@ local function recordRows(p, field, out, valueField)
   finish(out, n)
 end
 
+-- Target rows: dmgTargets holds plain numbers; healTargets holds {v, over} (v includes overheal).
+local function damageTargetRows(p, out)
+  local n = 0
+  local t = p.dmgTargets
+  if t then for key, v in pairs(t) do if v > 0 then n = n + 1; row(out, n, key, v, key, "target") end end end
+  finish(out, n)
+end
+
+local function healTargetRows(p, out, which)
+  local n = 0
+  local t = p.healTargets
+  if t then
+    for key, r in pairs(t) do
+      local over = r.over or 0
+      local v = which == "over" and over or (r.v - over)
+      if v > 0 then n = n + 1; row(out, n, key, v, key, "target") end
+    end
+  end
+  finish(out, n)
+end
+
 local function countRows(p, field, out)
   local n = 0
   local t = p[field]
@@ -414,15 +439,22 @@ end
 
 D.metrics = {
   { key = "dps", label = "DPS", rate = true, value = function(p, seg) return p.dmg / D.ActiveTime(p, seg) end, total = function(p) return p.dmg end,
-    rows = function(p, seg, out) recordRows(p, "spells", out) end, detail = detailFor, field = "spells" },
+    rows = function(p, seg, out) recordRows(p, "spells", out) end, detail = detailFor, field = "spells",
+    targets = damageTargetRows, targetField = "dmgTargets" },
   { key = "damage", label = "Damage", value = function(p) return p.dmg end,
-    rows = function(p, seg, out) recordRows(p, "spells", out) end, detail = detailFor, field = "spells" },
+    perSecond = function(p, seg) return p.dmg / D.ActiveTime(p, seg) end,
+    rows = function(p, seg, out) recordRows(p, "spells", out) end, detail = detailFor, field = "spells",
+    targets = damageTargetRows, targetField = "dmgTargets" },
   { key = "hps", label = "HPS", rate = true, value = function(p, seg) return (p.heal - p.over) / D.ActiveTime(p, seg) end, total = function(p) return p.heal - p.over end,
-    rows = function(p, seg, out) recordRows(p, "heals", out) end, detail = detailFor, field = "heals" },
+    rows = function(p, seg, out) recordRows(p, "heals", out) end, detail = detailFor, field = "heals",
+    targets = healTargetRows, targetField = "healTargets" },
   { key = "healing", label = "Healing", value = function(p) return p.heal - p.over end,
-    rows = function(p, seg, out) recordRows(p, "heals", out) end, detail = detailFor, field = "heals" },
+    perSecond = function(p, seg) return (p.heal - p.over) / D.ActiveTime(p, seg) end,
+    rows = function(p, seg, out) recordRows(p, "heals", out) end, detail = detailFor, field = "heals",
+    targets = healTargetRows, targetField = "healTargets" },
   { key = "overheal", label = "Overhealing", value = function(p) return p.over end,
-    rows = function(p, seg, out) recordRows(p, "heals", out, "over") end, detail = detailFor, field = "heals" },
+    rows = function(p, seg, out) recordRows(p, "heals", out, "over") end, detail = detailFor, field = "heals",
+    targets = function(p, out) healTargetRows(p, out, "over") end, targetField = "healTargets", targetOver = true },
   { key = "taken", label = "Damage taken", value = function(p) return p.taken end,
     rows = function(p, seg, out) recordRows(p, "takenSpells", out) end, detail = detailFor, field = "takenSpells" },
   { key = "dispels", label = "Dispels", count = true, value = function(p) return p.dispel end,
@@ -452,6 +484,7 @@ function D.PlayerRows(seg, metric, out)
         local r = row(out, n, name, v, name, "player")
         r.class = p.class
         r.total = metric.total and metric.total(p) or nil
+        r.perSecond = metric.perSecond and Z.db.showPerSecond and metric.perSecond(p, seg) or nil
         sum = sum + v
       end
     end

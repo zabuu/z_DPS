@@ -12,12 +12,25 @@ local widgets = {}
 local ROW = 16
 local COL = 150
 
+-- every font string made here is remembered so the outline setting can be re-applied;
+-- the drop shadow is dropped while an outline is on, so the text doesn't look doubled
+local fonts = {}
+local function setFont(fs)
+  local flags = Z.FontFlags()
+  fs:SetFont(FONT, fs.zSize, flags)
+  if fs.SetShadowColor then
+    fs:SetShadowColor(0, 0, 0, .9)
+    if flags == "" then fs:SetShadowOffset(1, -1) else fs:SetShadowOffset(0, 0) end
+  end
+end
 local function font(fs, size, muted)
-  fs:SetFont(FONT, size or 10, "")
-  if fs.SetShadowColor then fs:SetShadowColor(0, 0, 0, .9); fs:SetShadowOffset(1, -1) end
+  if not fs.zSize then table.insert(fonts, fs) end
+  fs.zSize = size or 10
+  setFont(fs)
   local c = muted and Z.UI.colors.muted or Z.UI.colors.text
   fs:SetTextColor(c[1], c[2], c[3], 1)
 end
+function C.ApplyFonts() for i = 1, getn(fonts) do setFont(fonts[i]) end end
 
 local function apply()
   Z.UI.ApplySettings()
@@ -128,9 +141,11 @@ local function build()
   check(frame, "Class icons", "classIcons", x2, y); y = y - ROW
   check(frame, "Short numbers (1.2k)", "shortNumbers", x1, y)
   check(frame, "Show percent", "showPercent", x2, y); y = y - ROW
+  check(frame, "Per second in Damage/Healing", "showPerSecond", x1, y)
   check(frame, "Rank numbers", "showRank", x2, y); y = y - ROW - 2
   cycle(frame, "DPS time", "dpsTime", { { "fight", "Fight" }, { "active", "Active" } }, x1, y)
-  cycle(frame, "Reset total", "resetTotal", { { "never", "Never" }, { "group", "Joining a group" }, { "instance", "New instance" }, { "combat", "Entering combat" } }, x2, y); y = y - ROW - 4
+  cycle(frame, "Reset total", "resetTotal", { { "never", "Never" }, { "group", "Joining a group" }, { "instance", "New instance" }, { "combat", "Entering combat" } }, x2, y); y = y - ROW - 1
+  cycle(frame, "Text outline", "outline", { { "none", "None" }, { "thin", "Thin" }, { "thick", "Thick" } }, x1, y); y = y - ROW - 4
   slider(frame, "Row height", "rowHeight", 10, 24, 1, x1, y); slider(frame, "Font size", "fontSize", 7, 16, 1, x2, y); y = y - 28
   slider(frame, "Bar opacity", "barAlpha", .1, 1, .05, x1, y); slider(frame, "Background opacity", "backdropAlpha", 0, 1, .05, x2, y); y = y - 28
   slider(frame, "Opacity in combat", "fightOpacity", .1, 1, .05, x1, y); slider(frame, "Opacity out of combat", "idleOpacity", .1, 1, .05, x2, y); y = y - 28
