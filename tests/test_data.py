@@ -204,14 +204,17 @@ zDPS.UI.Refresh()
     assert lua.eval('zDPS.UI.Title()').startswith("DPS · Current")
     # DPS rows show the total in parentheses
     assert first.text == "100 (1000)  95%"
-    # damage mode shows raw numbers, total mode label
+    # damage mode shows the total with DPS in parentheses, total mode label
     lua.execute('zDPS.UI.SetMetric("damage"); zDPS.UI.SetMode("total")')
     assert lua.eval('zDPS.UI.Title()').startswith("Damage · Total")
-    assert lua.eval('zDPS.UI.RowAt(1)').text == "1000  95%"
+    assert lua.eval('zDPS.UI.RowAt(1)').text == "1000 (100)  95%"
     lua.execute('zDPS.UI.Report("party")')
     chat = lua.eval('STUB.chat')
     msgs = [chat[i].msg for i in range(1, len(chat) + 1) if chat[i].channel == "PARTY"]
-    assert msgs[0].startswith("zDPS Damage (Total") and msgs[1] == "1. Zabbu  1000  95%" and msgs[2] == "2. Bankuu  50  5%"
+    assert msgs[0].startswith("zDPS Damage (Total") and msgs[1] == "1. Zabbu  1000 (100)  95%" and msgs[2] == "2. Bankuu  50 (5)  5%"
+    # the per-second part can be turned off
+    lua.execute('zDPSDB.showPerSecond = false; zDPS.UI.ApplySettings()')
+    assert lua.eval('zDPS.UI.RowAt(1)').text == "1000  95%"
 
 
 def test_short_numbers(lua):
@@ -278,3 +281,57 @@ zDPS.UI.Refresh()
     assert lua.eval('table.getn(zDPS.UI.windows)') == 1 and lua.eval('zDPS.db.windowCount') == 1
     lua.execute('zDPS.UI.CloseWindow(zDPS.UI.Window(1))')
     assert lua.eval('table.getn(zDPS.UI.windows)') == 1 and lua.eval('zDPSFrame:IsShown()') is False
+
+
+def test_target_breakdown(lua):
+    lua.execute('''
+combat(true)
+log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Boar for 300.")
+log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Wolf for 100.")
+log("CHAT_MSG_COMBAT_PET_HITS", "Imp hits Wolf for 9.")
+log("CHAT_MSG_SPELL_SELF_BUFF", "Your Flash Heal heals Bankuu for 500.")
+STUB.time = STUB.time + 10
+zDPS.UI.Refresh()
+''')
+    for seg in ("current", "total"):
+        t = lua.eval(f'player("{seg}", "Zabbu").dmgTargets')
+        assert t["Boar"] == 300 and t["Wolf"] == 109  # the Imp's hit counts toward its owner
+    h = lua.eval('player("current", "Zabbu").healTargets["Bankuu"]')
+    assert h.n == 1 and h.v == 500 and h.over == 100  # Bankuu was missing 400
+    # detail popup: switch to Targets
+    lua.execute('zDPS.UI.ClickRow(1, "LeftButton")')
+    tabs = lua.eval('zDPS.Detail.frame.tabs')
+    assert tabs[1].text.GetText(tabs[1].text) == "Spells" and tabs[2].IsShown(tabs[2]) is True
+    lua.execute('this = zDPS.Detail.frame.tabs[2]; this.scripts.OnClick()')
+    rows = lua.eval('(function() local t={} for i,r in ipairs(zDPS.Detail.ListRows()) do if r:IsShown() then t[i]={name=r.name:GetText(), value=r.value:GetText()} end end return t end)()')
+    assert rows[1].name == "Boar" and rows[1].value == "300  73%"
+    assert rows[2].name == "Wolf" and rows[2].value == "109  27%"
+    assert lua.eval('zDPS.Detail.frame.right.title:GetText()') == "Boar"
+    legend = lua.eval('(function() local t={} for i,r in ipairs(zDPS.Detail.LegendRows()) do if r:IsShown() then t[r.name:GetText()]=r.value:GetText() end end return t end)()')
+    assert legend["Damage"] == "300" and legend["Share"] == "73%"
+    # healing targets: effective healing and overheal
+    lua.execute('zDPS.UI.SetMetric("healing")')
+    lua.execute('zDPS.Detail.Refresh()')
+    rows = lua.eval('(function() local t={} for i,r in ipairs(zDPS.Detail.ListRows()) do if r:IsShown() then t[i]={name=r.name:GetText(), value=r.value:GetText()} end end return t end)()')
+    assert rows[1].name == "Bankuu" and rows[1].value == "400  100%"
+    legend = lua.eval('(function() local t={} for i,r in ipairs(zDPS.Detail.LegendRows()) do if r:IsShown() then t[r.name:GetText()]=r.value:GetText() end end return t end)()')
+    assert legend["Healing"] == "400" and legend["Overheal"] == "100  (20%)" and legend["Heals"] == "1"
+    # a metric without targets falls back to its normal list
+    lua.execute('zDPS.UI.SetMetric("dispels"); zDPS.Detail.Refresh()')
+    assert lua.eval('zDPS.Detail.frame.tabs[2]:IsShown()') is False
+
+
+def test_outline_setting(lua):
+    lua.execute('''
+seen = {}
+local orig = getmetatable(zDPSFrame).__index.SetFont
+getmetatable(zDPSFrame).__index.SetFont = function(self, f, size, flags) seen[flags or ""] = (seen[flags or ""] or 0) + 1; return 1 end
+zDPS.Config.Toggle()
+zDPSDB.outline = "thick"; zDPS.UI.ApplySettings()
+''')
+    assert lua.eval('zDPS.FontFlags()') == "THICKOUTLINE"
+    assert lua.eval('seen["THICKOUTLINE"]') > 10  # rows, title and the settings window
+    lua.execute('zDPSDB.outline = "thin"')
+    assert lua.eval('zDPS.FontFlags()') == "OUTLINE"
+    lua.execute('zDPSDB.outline = "none"')
+    assert lua.eval('zDPS.FontFlags()') == ""

@@ -27,17 +27,25 @@ combat log.
   absorbs/blocks/resists, min/max and totals. Heals show effective versus
   overheal. The popup follows the main window's metric and fight while open.
   Hovering a player on the main window shows their top five entries.
-- DPS and HPS rows show the total in parentheses: `1.2k (45.3k)  31%`.
+- DPS and HPS rows show the total in parentheses: `1.2k (45.3k)  31%`. Damage
+  and Healing rows show it the other way round, the total with DPS or HPS in
+  parentheses: `45.3k (1.2k)  31%` (settings toggle, on by default).
+- The detail popup has a **Spells | Targets** switch for DPS, Damage, HPS,
+  Healing and Overhealing. *Targets* lists where that player's damage or
+  healing went, with each target's share; heals also show effective versus
+  overheal per target. Mobs with the same name count as one target.
 - Rows carry class icons (settings toggle). Pets, totems and minions are merged
   into their owner (settings toggle, on by default).
-- Drag the window by its title. Drag the small square in the bottom-right
-  corner to resize. Title bar buttons: `+` opens another meter window with its
+- Drag the window by its title. Drag the dots in the bottom-right corner
+  to resize. Title bar buttons: `+` opens another meter window with its
   own metric and fight selection (windows are remembered between sessions),
   the circular arrow resets the current fight and history (shift-click resets
   only the total), the gear opens settings, the padlock locks position and
   size of all windows, and `x` closes that window (the first window only
   hides; `/zdps` brings everything back).
 - Mouse wheel scrolls long lists.
+- **Text outline** (settings): None, Thin or Thick, for readability over bright
+  bars. Applies to every window, the detail popup and the settings window.
 
 ### Slash commands
 
@@ -83,7 +91,9 @@ combat log.
   hit resolves in the first few `string.find` calls; no tables, closures or
   strings are created per line.
 - Aggregates are updated in place for the current fight and the total. Spell
-  records only hold the counters that were touched.
+  records only hold the counters that were touched. Per-target totals add one
+  number per target name (one small record per healed target); repeat hits
+  only update it.
 - The window refreshes at most twice a second, and only while it is shown and a
   fight is running or something changed. Rows are pooled frames; menus and the
   settings window are built on first use.
