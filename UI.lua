@@ -408,7 +408,7 @@ function U.ApplySettings()
   if db.locked then grip:Hide() else grip:Show() end
   frame.titleBar:SetHeight(db.rowHeight)
   if db.showTitle then frame.titleBar:Show() else frame.titleBar:Hide() end
-  font(title, db.fontSize)
+  font(title.text, db.fontSize)
   frame.lock.text:SetText(db.locked and "L" or "l")
   frame:SetAlpha(Z.inFight and db.fightOpacity or db.idleOpacity)
   layoutRows()
