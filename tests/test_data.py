@@ -335,3 +335,89 @@ zDPSDB.outline = "thick"; zDPS.UI.ApplySettings()
     assert lua.eval('zDPS.FontFlags()') == "OUTLINE"
     lua.execute('zDPSDB.outline = "none"')
     assert lua.eval('zDPS.FontFlags()') == ""
+
+
+def test_per_window_settings(lua):
+    lua.execute('''
+local w2 = zDPS.UI.AddWindow()
+zDPS.UI.SetMetric("threat", w2)
+-- the second window gets its own settings through the settings window
+zDPS.Config.Toggle(2)
+assert(zDPS.Config.Target() == 2)
+zDPS.Config.Set("show", "combat")
+zDPS.Config.Set("rowHeight", 18)
+zDPS.Config.Set("bgColor", {1, 0, 0, .5})
+zDPS.Config.Set("historySize", 9)       -- shared: always the all-windows value
+zDPS.UI.ApplySettings()
+''')
+    over = lua.eval('zDPS.db.windows[2].over')
+    assert over.show == "combat" and over.rowHeight == 18 and over.bgColor[1] == 1 and over.bgColor[4] == .5
+    assert over.historySize is None and lua.eval('zDPS.db.historySize') == 9
+    assert lua.eval('zDPS.UI.Cfg(zDPS.UI.Window(2)).rowHeight') == 18
+    assert lua.eval('zDPS.UI.Cfg(zDPS.UI.Window(1)).rowHeight') == 13
+    # an all-windows change reaches windows without their own value only
+    lua.execute('zDPS.Config.Toggle(); assert(zDPS.Config.Target() == nil); zDPS.Config.Set("rowHeight", 15); zDPS.Config.Set("fontSize", 12); zDPS.UI.ApplySettings()')
+    assert lua.eval('zDPS.UI.Cfg(zDPS.UI.Window(1)).rowHeight') == 15
+    assert lua.eval('zDPS.UI.Cfg(zDPS.UI.Window(2)).rowHeight') == 18
+    assert lua.eval('zDPS.UI.Cfg(zDPS.UI.Window(2)).fontSize') == 12
+    # visibility: kept up while settings are open, hidden out of combat once closed
+    assert lua.eval('zDPSFrame2:IsShown()') is True
+    lua.execute('zDPS.Config.Toggle()')
+    assert lua.eval('zDPS.Config.IsShown()') is False
+    assert lua.eval('zDPSFrame2:IsShown()') is False and lua.eval('zDPSFrame:IsShown()') is True
+    lua.execute('combat(true); log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Boar for 300.")')
+    assert lua.eval('zDPS.inFight') is True and lua.eval('zDPSFrame2:IsShown()') is True
+    lua.execute('combat(false); STUB.tick(1); STUB.tick(1); STUB.tick(1)')
+    assert lua.eval('zDPS.inFight') is False and lua.eval('zDPSFrame2:IsShown()') is False
+    # "In combat +5s" stays a little longer
+    lua.execute('zDPS.db.windows[2].over.show = "linger"; zDPS.UI.ApplySettings()')
+    lua.execute('combat(true); log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Boar for 300.")')
+    lua.execute('combat(false); STUB.tick(1); STUB.tick(1); STUB.tick(1)')
+    assert lua.eval('zDPS.inFight') is False and lua.eval('zDPSFrame2:IsShown()') is True
+    lua.execute('STUB.tick(6)')
+    assert lua.eval('zDPSFrame2:IsShown()') is False
+    # a window put away by the player isn't brought back by combat
+    lua.execute('zDPS.db.windows[2].over.show = "combat"; zDPS.UI.Hide()')
+    lua.execute('combat(true); log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Boar for 300.")')
+    assert lua.eval('zDPSFrame2:IsShown()') is False
+
+
+def test_old_settings_carry_over():
+    lua = LuaRuntime(unpack_returned_tuples=True)
+    lua.execute(f'dofile("{ROOT}/tests/wow_stub.lua")')
+    lua.execute(f'STUB.load("{ROOT}")')
+    lua.execute('zDPSDB = { hideOutOfCombat = true, backdropAlpha = .3 }')
+    lua.execute(SETUP)
+    assert lua.eval('zDPS.db.show') == "combat"
+    assert lua.eval('zDPS.db.bgColor[4]') == .3 and lua.eval('zDPS.db.bgColor[1]') == .04
+
+
+def test_colour_swatch(lua):
+    lua.execute('''
+OpacitySliderFrame = { value = 0, GetValue = function(self) return self.value end }
+ColorPickerFrame = { SetColorRGB = function(self, r, g, b) self.r, self.g, self.b = r, g, b end,
+  GetColorRGB = function(self) return self.r, self.g, self.b end, SetFrameStrata = function() end }
+function ShowUIPanel(f) f.shown = true end
+zDPS.Config.Toggle(1)
+local sw
+for _, f in ipairs(STUB.frames) do if f.box and f.text and f.text:GetText() == "Background" then sw = f end end
+assert(sw, "background swatch")
+this = sw; arg1 = "LeftButton"; sw.scripts.OnClick()
+assert(ColorPickerFrame.shown and ColorPickerFrame.hasOpacity)
+ColorPickerFrame.r, ColorPickerFrame.g, ColorPickerFrame.b = .5, .25, 0
+OpacitySliderFrame.value = .2
+ColorPickerFrame.func()
+''')
+    c = lua.eval('zDPS.db.windows[1].over.bgColor')
+    assert (c[1], c[2], c[3]) == (.5, .25, 0) and abs(c[4] - .8) < 1e-9
+    assert lua.eval('zDPS.db.bgColor[1]') == .04   # all-windows value untouched
+    # cancel puts the old colour back
+    lua.execute('ColorPickerFrame.cancelFunc()')
+    assert lua.eval('zDPS.db.windows[1].over.bgColor[1]') == .04
+    # right-click goes back to the all-windows value
+    lua.execute('''
+local sw
+for _, f in ipairs(STUB.frames) do if f.box and f.text and f.text:GetText() == "Background" then sw = f end end
+this = sw; arg1 = "RightButton"; sw.scripts.OnClick()
+''')
+    assert lua.eval('zDPS.db.windows[1].over') is None
