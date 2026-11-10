@@ -484,7 +484,7 @@ function D.PlayerRows(seg, metric, out)
         local r = row(out, n, name, v, name, "player")
         r.class = p.class
         r.total = metric.total and metric.total(p) or nil
-        r.perSecond = metric.perSecond and Z.db.showPerSecond and metric.perSecond(p, seg) or nil
+        r.perSecond = metric.perSecond and metric.perSecond(p, seg) or nil   -- each window decides whether to show it
         sum = sum + v
       end
     end

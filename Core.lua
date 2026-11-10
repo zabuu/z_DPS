@@ -8,9 +8,9 @@ local find, getn = string.find, table.getn
 local GetTime = GetTime
 
 Z.defaults = {
-  locked = false, hideOutOfCombat = false, showTitle = true, classColors = true, classIcons = true,
+  locked = false, showTitle = true, classColors = true, classIcons = true,
   mergePets = true, shortNumbers = true, showPercent = true, showRank = false,
-  rowHeight = 13, fontSize = 10, barAlpha = .85, backdropAlpha = .7, barTexture = "flat",
+  rowHeight = 13, fontSize = 10, barAlpha = .85, barTexture = "flat",
   metric = "dps", mode = "current", historySize = 5, dpsTime = "fight",
   resetTotal = "never",   -- never | group | instance | combat
   fightOpacity = 1, idleOpacity = 1,
@@ -18,17 +18,42 @@ Z.defaults = {
   threatRows = 8, reportRows = 5,
   outline = "none",        -- none | thin | thick: outline around all text
   showPerSecond = true,    -- Damage and Healing rows also show DPS / HPS in parentheses
+  show = "always",         -- always | combat | linger (in combat, then 5s after)
+  bgColor = { .04, .05, .07, .7 }, titleColor = { .08, .1, .13, 1 }, borderColor = { .18, .22, .28, 1 },
+  textColor = { .92, .94, .97 }, barColor = { .2, .78, .68 },   -- barColor: bars when class colours are off
 }
+
+-- Settings a single window can have its own value for (zDPSDB.windows[i].over[key]).
+-- Everything else is shared by all windows.
+Z.WINDOW_KEYS = { "show", "fightOpacity", "idleOpacity", "showTitle", "rowHeight", "fontSize", "outline",
+  "classColors", "classIcons", "showPercent", "showRank", "showPerSecond", "barAlpha",
+  "bgColor", "titleColor", "borderColor", "textColor", "barColor" }
+Z.isWindowKey = {}
+for _, k in ipairs(Z.WINDOW_KEYS) do Z.isWindowKey[k] = true end
+
+local function copy(v)
+  if type(v) ~= "table" then return v end
+  local t = {}
+  for k, x in pairs(v) do t[k] = x end
+  return t
+end
+Z.Copy = copy
 
 -- Font flags for the text outline setting.
 local OUTLINE = { none = "", thin = "OUTLINE", thick = "THICKOUTLINE" }
-function Z.FontFlags() return OUTLINE[Z.db and Z.db.outline or "none"] or "" end
+function Z.FontFlags(outline) return OUTLINE[outline or (Z.db and Z.db.outline) or "none"] or "" end
 
 function Z.Print(msg) DEFAULT_CHAT_FRAME:AddMessage("|cff7dff33zDPS|r "..tostring(msg)) end
 
 function Z.LoadSettings()
   if type(zDPSDB) ~= "table" then zDPSDB = {} end
-  for k, v in pairs(Z.defaults) do if zDPSDB[k] == nil then zDPSDB[k] = v end end
+  -- earlier versions: one hide-out-of-combat switch and a background opacity
+  if zDPSDB.show == nil and zDPSDB.hideOutOfCombat then zDPSDB.show = "combat" end
+  if zDPSDB.bgColor == nil and zDPSDB.backdropAlpha then
+    local d = Z.defaults.bgColor
+    zDPSDB.bgColor = { d[1], d[2], d[3], zDPSDB.backdropAlpha }
+  end
+  for k, v in pairs(Z.defaults) do if zDPSDB[k] == nil then zDPSDB[k] = copy(v) end end
   Z.db = zDPSDB
 end
 

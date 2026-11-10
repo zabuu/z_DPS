@@ -74,8 +74,8 @@ local function surface(f, color, alpha)
   f:SetBackdropBorderColor(U.colors.border[1], U.colors.border[2], U.colors.border[3], 1)
 end
 
-local function font(fs, size, color)
-  if not fs:SetFont(FONT, size or 10, Z.FontFlags()) and fs.SetFontObject then fs:SetFontObject(GameFontHighlightSmall) end
+local function font(fs, size, color, outline)
+  if not fs:SetFont(FONT, size or 10, Z.FontFlags(outline)) and fs.SetFontObject then fs:SetFontObject(GameFontHighlightSmall) end
   color = color or U.colors.text
   fs:SetTextColor(color[1], color[2], color[3], 1)
 end
@@ -167,6 +167,21 @@ end
 
 -- Window state ------------------------------------------------------------------------
 -- Z.db.windows[i] = {metric, mode, x, y, width, height, point}
+-- A window's settings: its own value where it has one (win.db.over), otherwise the
+-- all-windows value. Resolved into win.cfg when settings change, never per refresh.
+local function resolve(win)
+  local cfg, over = win.cfg or {}, win.db.over
+  win.cfg = cfg
+  for i = 1, getn(Z.WINDOW_KEYS) do
+    local k = Z.WINDOW_KEYS[i]
+    local v = over and over[k]
+    if v == nil then v = Z.db[k] end
+    cfg[k] = v
+  end
+  return cfg
+end
+function U.Cfg(win) return win.cfg or resolve(win) end
+
 local function windowSettings(i)
   Z.db.windows = Z.db.windows or {}
   local w = Z.db.windows[i]
@@ -258,8 +273,9 @@ local function getRow(win, i)
 end
 
 local function layoutRows(win)
-  local rh = Z.db.rowHeight
-  local top = Z.db.showTitle and (rh + 1) or 1
+  local c = U.Cfg(win)
+  local rh = c.rowHeight
+  local top = c.showTitle and (rh + 1) or 1
   local count = floor((win.frame:GetHeight() - top - 1) / rh)
   win.visible = max(count, 1)
   for i = 1, win.visible do
@@ -268,7 +284,7 @@ local function layoutRows(win)
     r:ClearAllPoints()
     r:SetPoint("TOPLEFT", win.frame, "TOPLEFT", 1, -top - (i - 1) * rh)
     r:SetPoint("TOPRIGHT", win.frame, "TOPRIGHT", -1, -top - (i - 1) * rh)
-    font(r.name, Z.db.fontSize); font(r.value, Z.db.fontSize)
+    font(r.name, c.fontSize, c.textColor, c.outline); font(r.value, c.fontSize, c.textColor, c.outline)
     r.icon:SetWidth(rh - 3); r.icon:SetHeight(rh - 3)
     r.name:SetPoint("RIGHT", r.value, "LEFT", -4, 0)
     r:Show()
@@ -277,10 +293,10 @@ local function layoutRows(win)
 end
 
 -- Refresh ----------------------------------------------------------------------------------
-local function paintRow(f, r, maxValue, text, cr, cg, cb)
+local function paintRow(f, r, maxValue, text, cr, cg, cb, c)
   f.row = r
-  if Z.db.classIcons and r.class and U.SetClassIcon(f.icon, r.class) then
-    f.icon:Show(); f.name:SetPoint("LEFT", f, "LEFT", Z.db.rowHeight + 1, 0)
+  if c.classIcons and r.class and U.SetClassIcon(f.icon, r.class) then
+    f.icon:Show(); f.name:SetPoint("LEFT", f, "LEFT", c.rowHeight + 1, 0)
   else
     f.icon:Hide(); f.name:SetPoint("LEFT", f, "LEFT", 3, 0)
   end
@@ -289,20 +305,20 @@ local function paintRow(f, r, maxValue, text, cr, cg, cb)
   local w = f:GetWidth()
   local frac = maxValue > 0 and (r.value or 0) / maxValue or 0
   f.bar:SetWidth(max(frac * w, 1))
-  f.bar:SetVertexColor(cr, cg, cb, Z.db.barAlpha)
+  f.bar:SetVertexColor(cr, cg, cb, c.barAlpha)
   f:Show()
 end
 
 local function playerRows(win, seg, metric)
-  local rowBuf = win.rowBuf
+  local rowBuf, c = win.rowBuf, U.Cfg(win)
   local sum = D.PlayerRows(seg, metric, rowBuf)
   for i = 1, rowBuf.n do
     local r = rowBuf[i]
     local v = U.FormatNumber(r.value)
     if metric.count then v = format("%d", r.value)
     elseif r.total then v = format("%s (%s)", v, U.FormatNumber(r.total))
-    elseif r.perSecond then v = format("%s (%s)", v, U.FormatNumber(r.perSecond)) end
-    if not metric.count and Z.db.showPercent and sum > 0 then r.text = format("%s  %.0f%%", v, r.value / sum * 100)
+    elseif r.perSecond and c.showPerSecond then v = format("%s (%s)", v, U.FormatNumber(r.perSecond)) end
+    if not metric.count and c.showPercent and sum > 0 then r.text = format("%s  %.0f%%", v, r.value / sum * 100)
     else r.text = v end
   end
   return sum
@@ -341,7 +357,8 @@ local function refreshWindow(win)
       metric.detail(p, view.field, view.key, rowBuf)
     end
   end
-  if Z.db.showTitle then win.title.text:SetText(header) end
+  local c = U.Cfg(win)
+  if c.showTitle then win.title.text:SetText(header) end
   local n = list.n or 0
   if view.offset > max(n - win.visible, 0) then view.offset = max(n - win.visible, 0) end
   local maxValue = n > 0 and list[1 + view.offset] and list[1 + view.offset].value or 0
@@ -353,12 +370,17 @@ local function refreshWindow(win)
       local cr, cg, cb
       local text = r.name
       if view.level == 1 or metric.threat then
-        if Z.db.classColors then cr, cg, cb = classColor(r.class) else cr, cg, cb = U.colors.accent[1], U.colors.accent[2], U.colors.accent[3] end
-        if metric.threat then cr, cg, cb = U.colors.threat[1], U.colors.threat[2], U.colors.threat[3]; if r.tank then cr, cg, cb = classColor(r.class) end end
-        if Z.db.showRank then text = (i + view.offset)..". "..text end
+        if c.classColors then cr, cg, cb = classColor(r.class) else cr, cg, cb = c.barColor[1], c.barColor[2], c.barColor[3] end
+        if metric.threat then
+          -- threat keeps its own colour unless this window was given a bar colour of its own
+          local own = win.db.over and win.db.over.barColor
+          if own then cr, cg, cb = own[1], own[2], own[3] else cr, cg, cb = U.colors.threat[1], U.colors.threat[2], U.colors.threat[3] end
+          if r.tank then cr, cg, cb = classColor(r.class) end
+        end
+        if c.showRank then text = (i + view.offset)..". "..text end
       elseif view.level == 2 then cr, cg, cb = U.colors.spell[1], U.colors.spell[2], U.colors.spell[3]
       else cr, cg, cb = U.colors.detail[1], U.colors.detail[2], U.colors.detail[3] end
-      paintRow(f, r, maxValue, text, cr, cg, cb)
+      paintRow(f, r, maxValue, text, cr, cg, cb, c)
     else
       f.row = nil; f:Hide()
     end
@@ -463,23 +485,28 @@ end
 
 local function applyWindow(win)
   local db, f = Z.db, win.frame
-  surface(f, U.colors.bg, db.backdropAlpha)
+  local c = resolve(win)
+  f:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } })
+  f:SetBackdropColor(c.bgColor[1], c.bgColor[2], c.bgColor[3], c.bgColor[4] or 1)
+  f:SetBackdropBorderColor(c.borderColor[1], c.borderColor[2], c.borderColor[3], c.borderColor[4] or 1)
+  win.titleBar.bg:SetVertexColor(c.titleColor[1], c.titleColor[2], c.titleColor[3], c.titleColor[4] or 1)
   f:SetWidth(win.db.width); f:SetHeight(win.db.height)
   f:ClearAllPoints()
   if win.db.point == "TOPLEFT" and win.db.x and win.db.y then f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", win.db.x, win.db.y)
   else f:SetPoint("CENTER", UIParent, "CENTER", win.db.x or 0, win.db.y or 0) end
   f:SetMovable(not db.locked); f:SetResizable(not db.locked)
   if db.locked then win.grip:Hide() else win.grip:Show() end
-  win.titleBar:SetHeight(db.rowHeight)
-  if db.showTitle then win.titleBar:Show() else win.titleBar:Hide() end
-  font(win.title.text, db.fontSize)
+  win.titleBar:SetHeight(c.rowHeight)
+  if c.showTitle then win.titleBar:Show() else win.titleBar:Hide() end
+  font(win.title.text, c.fontSize, c.textColor, c.outline)
   setGlyph(win.lock, db.locked and "locked" or "unlocked")
-  f:SetAlpha(Z.inFight and db.fightOpacity or db.idleOpacity)
+  f:SetAlpha(Z.inFight and c.fightOpacity or c.idleOpacity)
   layoutRows(win)
 end
 
 function U.ApplySettings()
   for i = 1, getn(U.windows) do applyWindow(U.windows[i]) end
+  U.UpdateVisibility()
   if Z.Detail and Z.Detail.ApplyFonts then Z.Detail.ApplyFonts() end
   if Z.Config and Z.Config.ApplyFonts then Z.Config.ApplyFonts() end
   dirty = true
@@ -545,7 +572,8 @@ local function createWindow(index)
     dirty = true; U.Refresh()
   end)
   win.reset:SetPoint("RIGHT", bar, "RIGHT", -42, 0)
-  win.config = glyphButton(bar, "config", "Settings", function() Z.Config.Toggle() end)
+  win.config = glyphButton(bar, "config", "Settings", function() Z.Config.Toggle(this.win.index) end)
+  win.config.win = win
   win.config:SetPoint("RIGHT", bar, "RIGHT", -28, 0)
   win.lock = glyphButton(bar, "unlocked", "Lock / unlock", function() Z.db.locked = not Z.db.locked; U.ApplySettings() end)
   win.lock:SetPoint("RIGHT", bar, "RIGHT", -14, 0)
@@ -599,7 +627,7 @@ end
 -- Closing removes a secondary window's settings; the first window only hides.
 function U.CloseWindow(win)
   if not win then return end
-  if win.index == 1 then win.frame:Hide(); return end
+  if win.index == 1 then win.closed = true; win.frame:Hide(); return end
   win.frame:Hide()
   local idx = win.index
   table.remove(U.windows, idx)
@@ -612,17 +640,37 @@ function U.CloseWindow(win)
   -- orphaned frames stay hidden; names are not reused within a session
 end
 
+-- Windows set to show only in combat. While the settings window is open they stay
+-- up so they can be adjusted; "linger" keeps one up for a few seconds after a fight.
+local LINGER = 5
+local lingerUntil
+function U.UpdateVisibility()
+  local now = GetTime()
+  local configOpen = Z.Config and Z.Config.IsShown and Z.Config.IsShown()
+  for i = 1, getn(U.windows) do
+    local win = U.windows[i]
+    local show = U.Cfg(win).show
+    if show ~= "always" and not win.closed then
+      local want = Z.inFight or configOpen or (show == "linger" and lingerUntil and now < lingerUntil)
+      if want then win.frame:Show() else win.frame:Hide() end
+    end
+  end
+end
+
 function U.OnCombat(inFight)
   for i = 1, getn(U.windows) do
     local win = U.windows[i]
-    win.frame:SetAlpha(inFight and Z.db.fightOpacity or Z.db.idleOpacity)
-    if Z.db.hideOutOfCombat then if inFight then win.frame:Show() else win.frame:Hide() end end
+    local c = U.Cfg(win)
+    win.frame:SetAlpha(inFight and c.fightOpacity or c.idleOpacity)
   end
+  lingerUntil = not inFight and GetTime() + LINGER or nil
+  U.UpdateVisibility()
   dirty = true
 end
 
-function U.Show() for i = 1, getn(U.windows) do U.windows[i].frame:Show() end end
-function U.Hide() for i = 1, getn(U.windows) do U.windows[i].frame:Hide() end end
+-- win.closed: put away by the player, so combat doesn't bring it back
+function U.Show() for i = 1, getn(U.windows) do U.windows[i].closed = nil; U.windows[i].frame:Show() end end
+function U.Hide() for i = 1, getn(U.windows) do U.windows[i].closed = true; U.windows[i].frame:Hide() end end
 function U.Toggle()
   local anyShown = false
   for i = 1, getn(U.windows) do if U.windows[i].frame:IsShown() then anyShown = true end end
@@ -644,6 +692,7 @@ ticker:SetScript("OnUpdate", function()
   nextRefresh = now + .5
   if dirty or Z.inFight or U.IsThreatVisible() then U.Refresh() end
   if Z.Detail then Z.Detail.Tick() end
+  if lingerUntil and now >= lingerUntil then lingerUntil = nil; U.UpdateVisibility() end
 end)
 
 function U.Init()
@@ -660,4 +709,5 @@ function U.Init()
   ticker:Show()
   dirty = true
   U.Refresh()
+  U.UpdateVisibility()
 end
