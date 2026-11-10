@@ -23,15 +23,13 @@ U.CLASS_COORDS = {
   PALADIN = { 0, .25, .5, .75 },
 }
 local PET_ICON = "Interface\\Icons\\Ability_Hunter_BeastCall"
--- Title bar glyphs: {texture, l, r, t, b}
+-- Title bar glyphs: flat white shapes shipped in media/, tinted at runtime.
+local MEDIA = "Interface\\AddOns\\z_DPS\\media\\"
 local GLYPH = {
-  add = { "Interface\\Buttons\\UI-PlusButton-Up", .2, .8, .2, .8 },
-  reset = { "Interface\\Buttons\\UI-RotationLeft-Button-Up", .2, .8, .2, .8 },
-  config = { "Interface\\Icons\\Trade_Engineering", .1, .9, .1, .9 },
-  locked = { "Interface\\Buttons\\LockButton-Locked-Up", .2, .8, .2, .8 },
-  unlocked = { "Interface\\Buttons\\LockButton-Unlocked-Up", .2, .8, .2, .8 },
-  close = { "Interface\\Buttons\\UI-Panel-MinimizeButton-Up", .2, .8, .2, .8 },
+  add = { MEDIA.."plus", 0, 1, 0, 1 }, reset = { MEDIA.."reset", 0, 1, 0, 1 }, config = { MEDIA.."gear", 0, 1, 0, 1 },
+  locked = { MEDIA.."lock", 0, 1, 0, 1 }, unlocked = { MEDIA.."unlock", 0, 1, 0, 1 }, close = { MEDIA.."close", 0, 1, 0, 1 },
 }
+local GLYPH_IDLE = { .62, .68, .76 }
 
 U.windows = {}
 local menu, menuItems = nil, {}
@@ -87,19 +85,21 @@ local function setGlyph(b, key)
   b.icon:SetTexture(g[1]); b.icon:SetTexCoord(g[2], g[3], g[4], g[5])
 end
 
-local function glyphButton(parent, key, tip, onClick)
+local function glyphButton(parent, key, tip, onClick, hover)
   local b = CreateFrame("Button", nil, parent)
-  b:SetWidth(12); b:SetHeight(12)
-  b.icon = b:CreateTexture(nil, "OVERLAY"); b.icon:SetAllPoints(b)
-  b.icon:SetVertexColor(.75, .8, .88, 1)
+  b:SetWidth(13); b:SetHeight(13)
+  b.icon = b:CreateTexture(nil, "OVERLAY")
+  b.icon:SetPoint("CENTER", b, "CENTER", 0, 0); b.icon:SetWidth(10); b.icon:SetHeight(10)
+  b.icon:SetVertexColor(GLYPH_IDLE[1], GLYPH_IDLE[2], GLYPH_IDLE[3], 1)
   setGlyph(b, key)
   b.tip = tip
+  b.hover = hover or U.colors.text
   b:SetScript("OnClick", onClick)
   b:SetScript("OnEnter", function()
-    this.icon:SetVertexColor(1, 1, 1, 1)
+    this.icon:SetVertexColor(this.hover[1], this.hover[2], this.hover[3], 1)
     if this.tip then GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT"); GameTooltip:SetText(this.tip, 1, 1, 1); GameTooltip:Show() end
   end)
-  b:SetScript("OnLeave", function() this.icon:SetVertexColor(.75, .8, .88, 1); GameTooltip:Hide() end)
+  b:SetScript("OnLeave", function() this.icon:SetVertexColor(GLYPH_IDLE[1], GLYPH_IDLE[2], GLYPH_IDLE[3], 1); GameTooltip:Hide() end)
   return b
 end
 
@@ -521,7 +521,7 @@ local function createWindow(index)
   local title = CreateFrame("Button", nil, bar)
   win.title = title
   title.win = win
-  title:SetPoint("TOPLEFT", bar, "TOPLEFT", 14, 0); title:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -52, 0)
+  title:SetPoint("TOPLEFT", bar, "TOPLEFT", 15, 0); title:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -56, 0)
   title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   title.text = title:CreateFontString(nil, "OVERLAY")
   title.text:SetPoint("LEFT", title, "LEFT", 2, 0); title.text:SetPoint("RIGHT", title, "RIGHT", 0, 0); title.text:SetJustifyH("LEFT")
@@ -544,12 +544,12 @@ local function createWindow(index)
     for i = 1, getn(U.windows) do U.windows[i].view.level = 1 end
     dirty = true; U.Refresh()
   end)
-  win.reset:SetPoint("RIGHT", bar, "RIGHT", -39, 0)
+  win.reset:SetPoint("RIGHT", bar, "RIGHT", -42, 0)
   win.config = glyphButton(bar, "config", "Settings", function() Z.Config.Toggle() end)
-  win.config:SetPoint("RIGHT", bar, "RIGHT", -26, 0)
+  win.config:SetPoint("RIGHT", bar, "RIGHT", -28, 0)
   win.lock = glyphButton(bar, "unlocked", "Lock / unlock", function() Z.db.locked = not Z.db.locked; U.ApplySettings() end)
-  win.lock:SetPoint("RIGHT", bar, "RIGHT", -13, 0)
-  win.close = glyphButton(bar, "close", "Close window", function() U.CloseWindow(this:GetParent():GetParent().win) end)
+  win.lock:SetPoint("RIGHT", bar, "RIGHT", -14, 0)
+  win.close = glyphButton(bar, "close", "Close window", function() U.CloseWindow(this.win) end, { .95, .45, .4 })
   win.close:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
   win.close.win = win
 

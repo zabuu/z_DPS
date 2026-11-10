@@ -46,6 +46,7 @@ local function addMember(unit, owner)
   local rec = Z.roster[name] or table.remove(rosterPool) or {}
   if owner then rec.class = "PET"; rec.owner = owner
   else local _, class = UnitClass(unit); rec.class = class or "UNKNOWN"; rec.owner = nil end
+  rec.short = nil
   Z.roster[name] = rec
   return name, rec
 end
@@ -87,9 +88,18 @@ function Z.ResolveSource(name)
     local now = GetTime()
     if now - lastRosterRefresh > 5 then Z.RefreshRoster(); rec = Z.roster[name] end
   end
+  if not rec then
+    -- OctoWoW logs pets as "Cringer (Zabbu)". Learn the pet once, keyed by the full name.
+    local _, _, pet, owner = find(name, "^(.-) %((.+)%)$")
+    if pet and Z.roster[owner] and not Z.roster[owner].owner then
+      rec = table.remove(rosterPool) or {}
+      rec.class = "PET"; rec.owner = owner; rec.short = pet
+      Z.roster[name] = rec
+    end
+  end
   if rec then
     if rec.owner then
-      if Z.db.mergePets then return rec.owner, name end
+      if Z.db.mergePets then return rec.owner, rec.short or name end
       return name, nil
     end
     return name, nil

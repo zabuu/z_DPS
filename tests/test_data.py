@@ -335,3 +335,22 @@ zDPSDB.outline = "thick"; zDPS.UI.ApplySettings()
     assert lua.eval('zDPS.FontFlags()') == "OUTLINE"
     lua.execute('zDPSDB.outline = "none"')
     assert lua.eval('zDPS.FontFlags()') == ""
+def test_octowow_pet_naming(lua):
+    lua.execute('''
+combat(true)
+log("CHAT_MSG_COMBAT_PET_HITS", "Cringer (Zabbu) crits Apprentice Training Dummy for 150.")
+log("CHAT_MSG_SPELL_PET_DAMAGE", "Cringer (Zabbu)'s Bite hits Apprentice Training Dummy for 122.")
+log("CHAT_MSG_COMBAT_PET_HITS", "Cringer (Zabbu) hits Apprentice Training Dummy for 74.")
+log("CHAT_MSG_SPELL_PET_BUFF", "Cringer (Zabbu) gains Dash.")
+log("CHAT_MSG_COMBAT_PET_HITS", "Growl (Bankuu) hits Apprentice Training Dummy for 10.")
+log("CHAT_MSG_COMBAT_CREATURE_VS_CREATURE_HITS", "Wolf (Stranger) hits Boar for 10.")
+''')
+    me = lua.eval('player("current", "Zabbu")')
+    assert me.dmg == 346 and me.spells["Cringer: Melee"].v == 224 and me.spells["Cringer: Bite"].v == 122
+    assert me.spells["Cringer: Melee"].crit == 1
+    assert lua.eval('player("current", "Bankuu")').dmg == 10
+    assert lua.eval('zDPS.roster["Wolf (Stranger)"]') is None
+    assert lua.eval('zDPS.roster["Cringer (Zabbu)"].short') == "Cringer"
+    # with merging off the pet is its own row under the full name
+    lua.execute('zDPS.db.mergePets = false; log("CHAT_MSG_COMBAT_PET_HITS", "Cringer (Zabbu) hits Apprentice Training Dummy for 5.")')
+    assert lua.eval('player("current", "Cringer (Zabbu)")').dmg == 5
