@@ -440,3 +440,23 @@ for _, f in ipairs(STUB.frames) do if f.box and f.text and f.text:GetText() == "
 this = sw; arg1 = "RightButton"; sw.scripts.OnClick()
 ''')
     assert lua.eval('zDPS.db.windows[1].over') is None
+
+
+def test_empty_fights_are_not_kept(lua):
+    # a real fight first
+    lua.execute('''
+log("CHAT_MSG_SPELL_SELF_DAMAGE", "Your Fireball hits Boar for 300.")
+STUB.tick(5); combat(false); STUB.tick(1); STUB.tick(1); STUB.tick(1)
+''')
+    assert lua.eval('table.getn(zDPS.Data.history)') == 1
+    combat_time = lua.eval('zDPS.Data.Segment("total").combatTime')
+    # then a few combat flags where nothing happens
+    for _ in range(3):
+        lua.execute('combat(true); STUB.tick(2); combat(false); STUB.tick(1); STUB.tick(1); STUB.tick(1)')
+        assert lua.eval('zDPS.inFight') is False
+    assert lua.eval('table.getn(zDPS.Data.history)') == 1
+    assert lua.eval('zDPS.Data.Segment("current").players["Zabbu"].dmg') == 300   # still the real fight
+    assert lua.eval('zDPS.Data.Segment("total").combatTime') == combat_time      # no idle time added
+    # a fight with only damage taken still counts
+    lua.execute('combat(true); log("CHAT_MSG_COMBAT_CREATURE_VS_SELF_HITS", "Boar hits you for 7."); STUB.tick(2); combat(false); STUB.tick(1); STUB.tick(1); STUB.tick(1)')
+    assert lua.eval('table.getn(zDPS.Data.history)') == 2
