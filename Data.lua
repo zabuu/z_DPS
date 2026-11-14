@@ -276,9 +276,23 @@ function D.StartFight()
   if Z.UI then Z.UI.Dirty() end
 end
 
+-- A fight where nobody in the group dealt, took or healed anything (combat flags
+-- from a mob tagging someone out of range, a dismount, a duel request…) isn't kept.
+local function empty(seg)
+  if seg.dmg > 0 or seg.heal > 0 then return false end
+  for _, p in pairs(seg.players) do if p.taken > 0 or p.heal > 0 or p.dmg > 0 then return false end end
+  return true
+end
+
 function D.EndFight()
   if not current or current.stop then return end
   current.stop = GetTime()
+  if empty(current) then
+    -- forget it: "Current fight" goes back to showing the last real one
+    current = D.history[1]; D.current = current
+    if Z.UI then Z.UI.Dirty() end
+    return
+  end
   total.combatTime = total.combatTime + (current.stop - current.start)
   table.insert(D.history, 1, current)
   while getn(D.history) > (Z.db.historySize or 5) do table.remove(D.history) end
